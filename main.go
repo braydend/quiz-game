@@ -14,7 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// TODO: Move to game struct
 var clients map[*websocket.Conn]*player
+var selectedAbility *AbilityResult
+var guessedPokemon map[string]bool
 
 const SYS_READY = "SYS_READY"
 const SYS_NOT_READY = "SYS_NOT_READY"
@@ -85,6 +88,8 @@ func messageHandler(c *websocket.Conn) {
 			default:
 				log.Printf("Unknown system command: %s", msg)
 			}
+		} else if selectedAbility != nil {
+			handleGuess(c, msg)
 		} else {
 			broadcast(mt, msg, player.id)
 		}
@@ -127,6 +132,31 @@ type player struct {
 	score   int
 }
 
+func handleGuess(c *websocket.Conn, msg []byte) {
+	log.Printf("Guess %s", msg)
+	var validAnswers []string
+	for _, pokemon := range selectedAbility.Pokemon {
+		validAnswers = append(validAnswers, pokemon.Pokemon.Name)
+	}
+	log.Printf("Valid answers: %s", strings.Join(validAnswers, ","))
+	guess := string(msg)
+
+	for _, pokemon := range selectedAbility.Pokemon {
+		if strings.ToUpper(pokemon.Pokemon.Name) == strings.ToUpper(guess) {
+			if isGuessed := guessedPokemon[pokemon.Pokemon.Name]; !isGuessed {
+				player := clients[c]
+				player.increaseScore()
+				guessedPokemon[pokemon.Pokemon.Name] = true
+
+				if err := c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.name, player.score))); err != nil {
+					log.Println("write:", err)
+					// break
+				}
+			}
+		}
+	}
+}
+
 func handleReady(c *websocket.Conn) {
 	player := clients[c]
 	player.toggleReady()
@@ -166,21 +196,30 @@ func (p *player) toggleReady() {
 	p.isReady = !p.isReady
 }
 
+func (p *player) increaseScore() {
+	p.score += 1
+}
+
 func (p *player) setName(name string) {
 	p.name = name
 }
 
 func startGame() {
 	broadcast(websocket.TextMessage, []byte("GAME STARTING"), "SERVER")
+	guessedPokemon = make(map[string]bool)
 
 	// TODO: remove
 	data := getAbilities()
 
 	i := rand.Intn(len(data.Results))
 
-	selectedAbility := data.Results[i]
+	randomAbility := data.Results[i]
 
-	ability := getAbility(selectedAbility.Name)
+	ability := getAbility(randomAbility.Name)
+	selectedAbility = &ability
+	for _, pokemon := range ability.Pokemon {
+		guessedPokemon[pokemon.Pokemon.Name] = false
+	}
 
 	broadcast(websocket.TextMessage, []byte(ability.Name), "SERVER")
 
@@ -227,13 +266,17 @@ func getAbilities() AbilitiesResponse {
 }
 
 type PokemonAbility struct {
-	Pokemon string `json:"pokemon.name"`
+	Name string `json:"name"`
+}
+
+type AbilityData struct {
+	Pokemon PokemonAbility `json:"pokemon"`
 }
 
 type AbilityResult struct {
-	Id      string         `json:"id"`
-	Name    string         `json:"name"`
-	Pokemon PokemonAbility `json:"pokemon"`
+	Id      string        `json:"id"`
+	Name    string        `json:"name"`
+	Pokemon []AbilityData `json:"pokemon"`
 }
 
 func getAbility(name string) AbilityResult {
