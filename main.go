@@ -1,8 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math/rand"
+	"net/http"
 	"strings"
 
 	"github.com/gofiber/contrib/websocket"
@@ -36,6 +40,7 @@ func main() {
 
 	/*
 		Joins connection pool
+		TODO: put a room/game ID in the url as a param
 	*/
 	app.Get("/ws/join", websocket.New(func(c *websocket.Conn) {
 		_, isExistingConnection := clients[c]
@@ -132,6 +137,9 @@ func handleReady(c *websocket.Conn) {
 	if err := c.WriteMessage(websocket.TextMessage, []byte(resp)); err != nil {
 		log.Println("write:", err)
 	}
+
+	//TODO: remove
+	startGame()
 }
 
 func handleUpdateName(c *websocket.Conn, newName string) {
@@ -164,4 +172,91 @@ func (p *player) setName(name string) {
 
 func startGame() {
 	broadcast(websocket.TextMessage, []byte("GAME STARTING"), "SERVER")
+
+	// TODO: remove
+	data := getAbilities()
+
+	i := rand.Intn(len(data.Results))
+
+	selectedAbility := data.Results[i]
+
+	ability := getAbility(selectedAbility.Name)
+
+	broadcast(websocket.TextMessage, []byte(ability.Name), "SERVER")
+
+	log.Printf("%v", data)
+}
+
+/**
+ API LOGIC
+**/
+
+type AbilitiesResult struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
+}
+
+type AbilitiesResponse struct {
+	Count   int               `json:"count"`
+	Results []AbilitiesResult `json:"results"`
+}
+
+func getAbilities() AbilitiesResponse {
+	resp, err := http.Get("https://pokeapi.co/api/v2/ability")
+
+	if err != nil {
+		log.Printf("Unable to lookup abilities. %s\n", err)
+	}
+
+	var data AbilitiesResponse
+
+	respBytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Printf("Unable to parse abilities response. %s\n", err)
+	}
+
+	log.Printf("%s", respBytes)
+
+	err = json.Unmarshal(respBytes, &data)
+	if err != nil {
+		log.Printf("Unable to parse abilities. %s\n", err)
+	}
+
+	return data
+}
+
+type PokemonAbility struct {
+	Pokemon string `json:"pokemon.name"`
+}
+
+type AbilityResult struct {
+	Id      string         `json:"id"`
+	Name    string         `json:"name"`
+	Pokemon PokemonAbility `json:"pokemon"`
+}
+
+func getAbility(name string) AbilityResult {
+	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/ability/%s", name))
+
+	if err != nil {
+		log.Printf("Unable to lookup ability (%s). %s\n", name, err)
+	}
+
+	var data AbilityResult
+
+	respBytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Printf("Unable to parse ability (%s) response. %s\n", name, err)
+	}
+
+	log.Printf("%s", respBytes)
+
+	err = json.Unmarshal(respBytes, &data)
+	if err != nil {
+		log.Printf("Unable to parse ability (%s). %s\n", name, err)
+	}
+
+	return data
 }
