@@ -1,0 +1,62 @@
+<script lang="ts">
+  var messages: string[] = [];
+  var msg: string;
+  var isReady = false;
+  $: name = "";
+
+  const websocket = new WebSocket("ws://localhost:3000/ws/join");
+
+  websocket.onmessage = (e) => {
+    console.log(e.data);
+    if ((e.data as string).startsWith("SYS")) {
+      handleSystemMessage(e.data);
+    }
+
+    messages = [...messages, e.data];
+  };
+
+  const handleSend = (msg: string) => {
+    websocket.send(msg);
+  };
+
+  const parseCommand = (msg: string): { command: string; payload?: string } => {
+    if (!msg.includes(":")) {
+      return { command: msg };
+    }
+    const splits = msg.split(":");
+    const command = splits[0].trim();
+    const payload = splits[1].trim();
+
+    return { command, payload };
+  };
+
+  const handleSystemMessage = (msg: string) => {
+    const { command, payload } = parseCommand(msg);
+
+    switch (command) {
+      case "SYS_READY":
+      case "SYS_NOT_READY":
+        isReady = msg === "SYS_READY";
+        break;
+      case "SYS_UPDATE_NAME":
+        name = payload ?? name;
+        break;
+      default:
+        console.error(`Unknown system command: ${msg}`);
+    }
+  };
+</script>
+
+<main>
+  name: {name}
+  <ul>
+    {#each messages as message}
+      <li>{message}</li>
+    {/each}
+  </ul>
+  <input bind:value={msg} type="text" />
+  <button on:click={() => handleSend(msg)}>Send</button>
+  <button on:click={() => handleSend("SYS_READY")}
+    >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
+  >
+</main>
