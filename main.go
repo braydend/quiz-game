@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gofiber/contrib/websocket"
@@ -26,6 +27,17 @@ const SYS_UPDATE_NAME = "SYS_UPDATE_NAME"
 const SYS_CORRECT_ANSWER = "SYS_CORRECT_ANSWER"
 const SYS_SYNC = "SYS_SYNC"
 const SYS_UPDATE_SCORE = "SYS_UPDATE_SCORE"
+const SYS_NEW_PROMPT = "SYS_NEW_PROMPT"
+
+type Message struct {
+	Command string      `json:"command"`
+	Payload interface{} `json:"payload"`
+}
+
+type CorrectAnswerPayload struct {
+	Name   string `json:"name"`
+	Sprite string `json:"sprite"`
+}
 
 func getPort() string {
 	port := os.Getenv("PORT")
@@ -149,13 +161,84 @@ func parseCommand(msg []byte) (command string, payload string) {
 	return strings.TrimSpace(string(splits[0])), strings.TrimSpace(string(splits[1]))
 }
 
-func handleSync(c *websocket.Conn) {
+func sendNewPromptCommandBroad() {
+	newPromptCommand := Message{Command: SYS_NEW_PROMPT, Payload: selectedAbility.Name}
+	newPromptCommandBytes, err := json.Marshal(newPromptCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal update name command")
+	}
+
+	broadcast(websocket.TextMessage, newPromptCommandBytes)
+}
+
+// TODO: Change to UPDATE_PROMPT
+func sendNewPromptCommandDirect(c *websocket.Conn) {
+	newPromptCommand := Message{Command: SYS_NEW_PROMPT, Payload: selectedAbility.Name}
+	newPromptCommandBytes, err := json.Marshal(newPromptCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal update name command")
+	}
+
+	directMessage(c, websocket.TextMessage, newPromptCommandBytes)
+}
+
+func sendUpdateNameCommand(c *websocket.Conn) {
 	player := clients[c]
-	directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_UPDATE_NAME, player.name)))
-	directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%d", SYS_UPDATE_SCORE, player.score)))
+	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: player.name}
+	updateNameCommandBytes, err := json.Marshal(updateNameCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal update name command")
+	}
+	directMessage(c, websocket.TextMessage, updateNameCommandBytes)
+}
+
+func sendUpdateScoreCommand(c *websocket.Conn) {
+	player := clients[c]
+	updateScoreCommand := Message{Command: SYS_UPDATE_SCORE, Payload: strconv.Itoa(player.score)}
+	updateScoreCommandBytes, err := json.Marshal(updateScoreCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal update score command")
+	}
+
+	directMessage(c, websocket.TextMessage, updateScoreCommandBytes)
+}
+
+func sendCorrectAnswerCommandDirect(c *websocket.Conn, name string) {
+	pokemonData := getPokemon(name)
+	correctAnswerCommand := Message{Command: SYS_CORRECT_ANSWER, Payload: CorrectAnswerPayload{Name: pokemonData.Name, Sprite: pokemonData.Sprites.FrontDefault}}
+	correctAnswerCommandBytes, err := json.Marshal(correctAnswerCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal guess pokemon command")
+	}
+	directMessage(c, websocket.TextMessage, correctAnswerCommandBytes)
+}
+
+func sendCorrectAnswerCommandBroad(name string) {
+	pokemonData := getPokemon(name)
+	correctAnswerCommand := Message{Command: SYS_CORRECT_ANSWER, Payload: CorrectAnswerPayload{Name: pokemonData.Name, Sprite: pokemonData.Sprites.FrontDefault}}
+	correctAnswerCommandBytes, err := json.Marshal(correctAnswerCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal guess pokemon command")
+	}
+	broadcast(websocket.TextMessage, correctAnswerCommandBytes)
+}
+
+func handleSync(c *websocket.Conn) {
+	sendUpdateNameCommand(c)
+	sendUpdateScoreCommand(c)
+	if selectedAbility != nil {
+		sendNewPromptCommandDirect(c)
+	}
+
 	for name, isGuessed := range guessedPokemon {
 		if isGuessed {
-			directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_CORRECT_ANSWER, name)))
+			sendCorrectAnswerCommandDirect(c, name)
 		}
 	}
 }
@@ -186,9 +269,9 @@ func handleGuess(c *websocket.Conn, msg []byte) {
 			if isGuessed := guessedPokemon[pokemon.Pokemon.Name]; !isGuessed {
 				player.increaseScore()
 				guessedPokemon[pokemon.Pokemon.Name] = true
+				sendUpdateScoreCommand(c)
 				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.name, player.score)))
-				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_CORRECT_ANSWER, guess)))
-				directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%d", SYS_UPDATE_SCORE, player.score)))
+				sendCorrectAnswerCommandBroad(pokemon.Pokemon.Name)
 			}
 		}
 	}
@@ -210,8 +293,14 @@ func handleReady(c *websocket.Conn) {
 func handleUpdateName(c *websocket.Conn, newName string) {
 	player := clients[c]
 	player.setName(newName)
-	resp := fmt.Sprintf("%s: %s", SYS_UPDATE_NAME, newName)
-	directMessage(c, websocket.TextMessage, []byte(resp))
+
+	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: newName}
+	updateNameCommandBytes, err := json.Marshal(updateNameCommand)
+
+	if err != nil {
+		log.Printf("Failed to marshal update name command")
+	}
+	directMessage(c, websocket.TextMessage, updateNameCommandBytes)
 }
 
 func newPlayer() player {
@@ -242,6 +331,11 @@ func startGame() {
 	guessedPokemon = make(map[string]bool)
 
 	// TODO: remove
+	selectNewPrompt()
+	sendNewPromptCommandBroad()
+}
+
+func selectNewPrompt() {
 	data := getAbilities()
 
 	i := rand.Intn(len(data.Results))
@@ -254,9 +348,7 @@ func startGame() {
 		guessedPokemon[pokemon.Pokemon.Name] = false
 	}
 
-	broadcast(websocket.TextMessage, []byte(ability.Name))
-
-	log.Printf("%v", data)
+	sendNewPromptCommandBroad()
 }
 
 /**
@@ -274,7 +366,7 @@ type AbilitiesResponse struct {
 }
 
 func getAbilities() AbilitiesResponse {
-	resp, err := http.Get("https://pokeapi.co/api/v2/ability")
+	resp, err := http.Get("https://pokeapi.co/api/v2/ability?limit=500")
 
 	if err != nil {
 		log.Printf("Unable to lookup abilities. %s\n", err)
@@ -300,6 +392,7 @@ func getAbilities() AbilitiesResponse {
 
 type PokemonAbility struct {
 	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 type AbilityData struct {
@@ -332,6 +425,41 @@ func getAbility(name string) AbilityResult {
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		log.Printf("Unable to parse ability (%s). %s\n", name, err)
+	}
+
+	return data
+}
+
+type PokemonSprite struct {
+	FrontDefault string `json:"front_default"`
+}
+
+type PokemonResult struct {
+	Id      int           `json:"id"`
+	Name    string        `json:"name"`
+	Sprites PokemonSprite `json:"sprites"`
+}
+
+func getPokemon(name string) PokemonResult {
+	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", name))
+
+	if err != nil {
+		log.Printf("Unable to lookup pokemon (%s). %s\n", name, err)
+	}
+
+	var data PokemonResult
+
+	respBytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Printf("Unable to parse pokemon (%s) response. %s\n", name, err)
+	}
+
+	log.Printf("%s", respBytes)
+
+	err = json.Unmarshal(respBytes, &data)
+	if err != nil {
+		log.Printf("Unable to parse pokemon (%s). %s\n", name, err)
 	}
 
 	return data
