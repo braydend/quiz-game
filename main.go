@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gofiber/contrib/websocket"
@@ -25,6 +26,17 @@ const SYS_UPDATE_NAME = "SYS_UPDATE_NAME"
 const SYS_CORRECT_ANSWER = "SYS_CORRECT_ANSWER"
 const SYS_SYNC = "SYS_SYNC"
 const SYS_UPDATE_SCORE = "SYS_UPDATE_SCORE"
+
+func getPort() string {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = ":3000"
+	} else {
+		port = ":" + port
+	}
+
+	return port
+}
 
 func main() {
 	clients = make(map[*websocket.Conn]*player)
@@ -60,7 +72,7 @@ func main() {
 		messageHandler(c)
 	}))
 
-	app.Listen("0.0.0.0:3000")
+	app.Listen(getPort())
 }
 
 func messageHandler(c *websocket.Conn) {
