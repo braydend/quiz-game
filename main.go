@@ -22,6 +22,7 @@ var guessedPokemon map[string]bool
 const SYS_READY = "SYS_READY"
 const SYS_NOT_READY = "SYS_NOT_READY"
 const SYS_UPDATE_NAME = "SYS_UPDATE_NAME"
+const SYS_CORRECT_ANSWER = "SYS_CORRECT_ANSWER"
 
 func main() {
 	clients = make(map[*websocket.Conn]*player)
@@ -91,7 +92,8 @@ func messageHandler(c *websocket.Conn) {
 		} else if selectedAbility != nil {
 			handleGuess(c, msg)
 		} else {
-			broadcast(mt, msg, player.id)
+			signedMsg := fmt.Sprintf("%s: %s", player.name, msg)
+			broadcast(mt, []byte(signedMsg))
 		}
 	}
 }
@@ -99,10 +101,9 @@ func messageHandler(c *websocket.Conn) {
 /*
 Send a message to all established clients
 */
-func broadcast(mt int, msg []byte, sender string) {
-	signedMsg := fmt.Sprintf("%s: %s", sender, msg)
+func broadcast(mt int, msg []byte) {
 	for c, _ := range clients {
-		if err := c.WriteMessage(mt, []byte(signedMsg)); err != nil {
+		if err := c.WriteMessage(mt, msg); err != nil {
 			log.Println("write:", err)
 			// break
 		}
@@ -140,18 +141,15 @@ func handleGuess(c *websocket.Conn, msg []byte) {
 	}
 	log.Printf("Valid answers: %s", strings.Join(validAnswers, ","))
 	guess := string(msg)
+	player := clients[c]
 
 	for _, pokemon := range selectedAbility.Pokemon {
 		if strings.ToUpper(pokemon.Pokemon.Name) == strings.ToUpper(guess) {
 			if isGuessed := guessedPokemon[pokemon.Pokemon.Name]; !isGuessed {
-				player := clients[c]
 				player.increaseScore()
 				guessedPokemon[pokemon.Pokemon.Name] = true
-
-				if err := c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.name, player.score))); err != nil {
-					log.Println("write:", err)
-					// break
-				}
+				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.name, player.score)))
+				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_CORRECT_ANSWER, guess)))
 			}
 		}
 	}
@@ -205,7 +203,7 @@ func (p *player) setName(name string) {
 }
 
 func startGame() {
-	broadcast(websocket.TextMessage, []byte("GAME STARTING"), "SERVER")
+	broadcast(websocket.TextMessage, []byte("GAME STARTING"))
 	guessedPokemon = make(map[string]bool)
 
 	// TODO: remove
@@ -221,7 +219,7 @@ func startGame() {
 		guessedPokemon[pokemon.Pokemon.Name] = false
 	}
 
-	broadcast(websocket.TextMessage, []byte(ability.Name), "SERVER")
+	broadcast(websocket.TextMessage, []byte(ability.Name))
 
 	log.Printf("%v", data)
 }

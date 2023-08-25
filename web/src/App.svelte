@@ -2,6 +2,7 @@
   var messages: string[] = [];
   var msg: string;
   var isReady = false;
+  $: correctAnswers = new Array<string>();
   $: name = "";
 
   const websocket = new WebSocket("ws://localhost:3000/ws/join");
@@ -41,6 +42,11 @@
       case "SYS_UPDATE_NAME":
         name = payload ?? name;
         break;
+      case "SYS_CORRECT_ANSWER":
+        if (payload) {
+          correctAnswers = [...correctAnswers, payload];
+        }
+        break;
       default:
         console.error(`Unknown system command: ${msg}`);
     }
@@ -49,6 +55,11 @@
 
 <main>
   name: {name}
+  <div>
+    {#each correctAnswers as correctAnswer}
+      <div class="correctAnswer">{correctAnswer}</div>
+    {/each}
+  </div>
   <ul>
     {#each messages as message}
       <li>{message}</li>
@@ -60,3 +71,8 @@
     >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
   >
 </main>
+
+<style>
+  .correctAnswer {
+  }
+</style>
