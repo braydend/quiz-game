@@ -1,20 +1,31 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+
+  var websocket: WebSocket;
+
   var messages: string[] = [];
   var msg: string;
   var isReady = false;
   $: correctAnswers = new Array<string>();
   $: name = "";
+  $: score = 0;
 
-  const websocket = new WebSocket("ws://localhost:3000/ws/join");
+  onMount(() => {
+    websocket = new WebSocket("ws://localhost:3000/ws/join");
 
-  websocket.onmessage = (e) => {
-    console.log(e.data);
-    if ((e.data as string).startsWith("SYS")) {
-      handleSystemMessage(e.data);
-    }
+    websocket.onmessage = (e) => {
+      console.log(e.data);
+      if ((e.data as string).startsWith("SYS")) {
+        handleSystemMessage(e.data);
+      }
 
-    messages = [...messages, e.data];
-  };
+      messages = [...messages, e.data];
+    };
+
+    websocket.addEventListener("open", () => {
+      websocket.send("SYS_SYNC");
+    });
+  });
 
   const handleSend = (msg: string) => {
     websocket.send(msg);
@@ -47,6 +58,9 @@
           correctAnswers = [...correctAnswers, payload];
         }
         break;
+      case "SYS_UPDATE_SCORE":
+        score = Number(payload) ?? score;
+        break;
       default:
         console.error(`Unknown system command: ${msg}`);
     }
@@ -54,7 +68,8 @@
 </script>
 
 <main>
-  name: {name}
+  <span>name: {name}</span>
+  <span>score: {score}</span>
   <div>
     {#each correctAnswers as correctAnswer}
       <div class="correctAnswer">{correctAnswer}</div>

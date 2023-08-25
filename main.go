@@ -23,6 +23,8 @@ const SYS_READY = "SYS_READY"
 const SYS_NOT_READY = "SYS_NOT_READY"
 const SYS_UPDATE_NAME = "SYS_UPDATE_NAME"
 const SYS_CORRECT_ANSWER = "SYS_CORRECT_ANSWER"
+const SYS_SYNC = "SYS_SYNC"
+const SYS_UPDATE_SCORE = "SYS_UPDATE_SCORE"
 
 func main() {
 	clients = make(map[*websocket.Conn]*player)
@@ -86,6 +88,10 @@ func messageHandler(c *websocket.Conn) {
 				handleUpdateName(c, payload)
 				break
 
+			case SYS_SYNC:
+				handleSync(c)
+				break
+
 			default:
 				log.Printf("Unknown system command: %s", msg)
 			}
@@ -110,6 +116,15 @@ func broadcast(mt int, msg []byte) {
 	}
 }
 
+/*
+Send a message to a specific client
+*/
+func directMessage(c *websocket.Conn, mt int, msg []byte) {
+	if err := c.WriteMessage(mt, msg); err != nil {
+		log.Println("write:", err)
+	}
+}
+
 func parseCommand(msg []byte) (command string, payload string) {
 	hasPayload := strings.Contains(string(msg), ":")
 
@@ -120,6 +135,17 @@ func parseCommand(msg []byte) (command string, payload string) {
 	splits := strings.Split(string(msg), ":")
 
 	return strings.TrimSpace(string(splits[0])), strings.TrimSpace(string(splits[1]))
+}
+
+func handleSync(c *websocket.Conn) {
+	player := clients[c]
+	directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_UPDATE_NAME, player.name)))
+	directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%d", SYS_UPDATE_SCORE, player.score)))
+	for name, isGuessed := range guessedPokemon {
+		if isGuessed {
+			directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_CORRECT_ANSWER, name)))
+		}
+	}
 }
 
 /*
@@ -150,6 +176,7 @@ func handleGuess(c *websocket.Conn, msg []byte) {
 				guessedPokemon[pokemon.Pokemon.Name] = true
 				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.name, player.score)))
 				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", SYS_CORRECT_ANSWER, guess)))
+				directMessage(c, websocket.TextMessage, []byte(fmt.Sprintf("%s:%d", SYS_UPDATE_SCORE, player.score)))
 			}
 		}
 	}
@@ -162,9 +189,7 @@ func handleReady(c *websocket.Conn) {
 	if !player.isReady {
 		resp = SYS_NOT_READY
 	}
-	if err := c.WriteMessage(websocket.TextMessage, []byte(resp)); err != nil {
-		log.Println("write:", err)
-	}
+	directMessage(c, websocket.TextMessage, []byte(resp))
 
 	//TODO: remove
 	startGame()
@@ -174,9 +199,7 @@ func handleUpdateName(c *websocket.Conn, newName string) {
 	player := clients[c]
 	player.setName(newName)
 	resp := fmt.Sprintf("%s: %s", SYS_UPDATE_NAME, newName)
-	if err := c.WriteMessage(websocket.TextMessage, []byte(resp)); err != nil {
-		log.Println("write:", err)
-	}
+	directMessage(c, websocket.TextMessage, []byte(resp))
 }
 
 func newPlayer() player {
