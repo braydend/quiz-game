@@ -11,7 +11,7 @@
   $: score = 0;
 
   onMount(() => {
-    websocket = new WebSocket(`ws://${location.host}/ws/join`);
+    websocket = new WebSocket(`wss://${location.host}/ws/join`);
 
     websocket.onmessage = (e) => {
       console.log(e.data);
