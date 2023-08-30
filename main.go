@@ -21,7 +21,6 @@ var selectedAbility *pokeapi.AbilityResult
 var guessedPokemon map[string]bool
 
 const SYS_READY = "SYS_READY"
-const SYS_NOT_READY = "SYS_NOT_READY"
 const SYS_UPDATE_NAME = "SYS_UPDATE_NAME"
 const SYS_CORRECT_ANSWER = "SYS_CORRECT_ANSWER"
 const SYS_SYNC = "SYS_SYNC"
@@ -122,7 +121,7 @@ func messageHandler(c *websocket.Conn) {
 		if strings.Contains(message.Command, "SYS") {
 			switch message.Command {
 			case SYS_READY:
-				handleReady(c)
+				handleReady(c, getPayloadAsBool(message))
 				break
 
 			case SYS_UPDATE_NAME:
@@ -164,6 +163,10 @@ func directMessage(c *websocket.Conn, mt int, msg []byte) {
 	if err := c.WriteMessage(mt, msg); err != nil {
 		log.Println("write:", err)
 	}
+}
+
+func getPayloadAsBool(msg Message) bool {
+	return msg.Payload.(bool)
 }
 
 func getPayloadAsString(msg Message) string {
@@ -335,17 +338,29 @@ func handleGuess(c *websocket.Conn, msg Message) {
 	}
 }
 
-func handleReady(c *websocket.Conn) {
+func handleReady(c *websocket.Conn, isReady bool) {
 	player := clients[c]
-	player.toggleReady()
-	resp := SYS_READY
-	if !player.isReady {
-		resp = SYS_NOT_READY
+	player.setReady(isReady)
+
+	readyCommand := Message{Command: SYS_READY, Payload: isReady}
+	readyCommandBytes, err := json.Marshal(readyCommand)
+
+	if err != nil {
+		log.Println("Unable to marshal ready command")
 	}
-	directMessage(c, websocket.TextMessage, []byte(resp))
+
+	directMessage(c, websocket.TextMessage, readyCommandBytes)
+
+	isAllReady := true
+
+	for _, player := range clients {
+		isAllReady = player.isReady && isAllReady
+	}
 
 	//TODO: remove
-	startGame()
+	if isAllReady {
+		startGame()
+	}
 }
 
 func handleUpdateName(c *websocket.Conn, newName string) {
@@ -372,8 +387,8 @@ func newPlayer() player {
 	return player{id, id, false, 0}
 }
 
-func (p *player) toggleReady() {
-	p.isReady = !p.isReady
+func (p *player) setReady(isReady bool) {
+	p.isReady = isReady
 }
 
 func (p *player) increaseScore() {
@@ -408,117 +423,3 @@ func selectNewPrompt() {
 
 	sendNewPromptCommandBroad()
 }
-
-// /**
-//  API LOGIC
-// **/
-
-// type AbilitiesResult struct {
-// 	Name string `json:"name"`
-// 	Url  string `json:"url"`
-// }
-
-// type AbilitiesResponse struct {
-// 	Count   int               `json:"count"`
-// 	Results []AbilitiesResult `json:"results"`
-// }
-
-// func getAbilities() AbilitiesResponse {
-// 	resp, err := http.Get("https://pokeapi.co/api/v2/ability?limit=500")
-
-// 	if err != nil {
-// 		log.Printf("Unable to lookup abilities. %s\n", err)
-// 	}
-
-// 	var data AbilitiesResponse
-
-// 	respBytes, err := io.ReadAll(resp.Body)
-
-// 	if err != nil {
-// 		log.Printf("Unable to parse abilities response. %s\n", err)
-// 	}
-
-// 	log.Printf("%s", respBytes)
-
-// 	err = json.Unmarshal(respBytes, &data)
-// 	if err != nil {
-// 		log.Printf("Unable to parse abilities. %s\n", err)
-// 	}
-
-// 	return data
-// }
-
-// type PokemonAbility struct {
-// 	Name string `json:"name"`
-// 	URL  string `json:"url"`
-// }
-
-// type AbilityData struct {
-// 	Pokemon PokemonAbility `json:"pokemon"`
-// }
-
-// type AbilityResult struct {
-// 	Id      string        `json:"id"`
-// 	Name    string        `json:"name"`
-// 	Pokemon []AbilityData `json:"pokemon"`
-// }
-
-// func getAbility(name string) AbilityResult {
-// 	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/ability/%s", name))
-
-// 	if err != nil {
-// 		log.Printf("Unable to lookup ability (%s). %s\n", name, err)
-// 	}
-
-// 	var data AbilityResult
-
-// 	respBytes, err := io.ReadAll(resp.Body)
-
-// 	if err != nil {
-// 		log.Printf("Unable to parse ability (%s) response. %s\n", name, err)
-// 	}
-
-// 	log.Printf("%s", respBytes)
-
-// 	err = json.Unmarshal(respBytes, &data)
-// 	if err != nil {
-// 		log.Printf("Unable to parse ability (%s). %s\n", name, err)
-// 	}
-
-// 	return data
-// }
-
-// type PokemonSprite struct {
-// 	FrontDefault string `json:"front_default"`
-// }
-
-// type PokemonResult struct {
-// 	Id      int           `json:"id"`
-// 	Name    string        `json:"name"`
-// 	Sprites PokemonSprite `json:"sprites"`
-// }
-
-// func getPokemon(name string) PokemonResult {
-// 	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", name))
-
-// 	if err != nil {
-// 		log.Printf("Unable to lookup pokemon (%s). %s\n", name, err)
-// 	}
-
-// 	var data PokemonResult
-
-// 	respBytes, err := io.ReadAll(resp.Body)
-
-// 	if err != nil {
-// 		log.Printf("Unable to parse pokemon (%s) response. %s\n", name, err)
-// 	}
-
-// 	log.Printf("%s", respBytes)
-
-// 	err = json.Unmarshal(respBytes, &data)
-// 	if err != nil {
-// 		log.Printf("Unable to parse pokemon (%s). %s\n", name, err)
-// 	}
-
-// 	return data
-// }

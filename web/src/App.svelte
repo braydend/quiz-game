@@ -65,8 +65,7 @@
 
     switch (command) {
       case "SYS_READY":
-      case "SYS_NOT_READY":
-        isReady = command === "SYS_READY";
+        isReady = payload;
         break;
       case "SYS_UPDATE_NAME":
         store.name.set(payload);
