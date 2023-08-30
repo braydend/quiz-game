@@ -30,6 +30,7 @@
       console.log(parsedMessage);
       if (parsedMessage.command.startsWith("SYS")) {
         handleSystemMessage(parsedMessage);
+        return;
       }
 
       messages = [...messages, parsedMessage];
@@ -58,6 +59,8 @@
   const handleSystemMessage = (msg: Message) => {
     const { command, payload } = msg;
 
+    console.log("SYSTEM MESSAGE:", msg);
+
     switch (command) {
       case "SYS_READY":
       case "SYS_NOT_READY":
@@ -72,7 +75,6 @@
           // const parsedPayload = JSON.parse(payload);
           const parsedPayload = payload;
           const { name, sprite } = parsedPayload;
-          console.log("correct answer:", parsedPayload);
           correctAnswers = [...correctAnswers, { name, sprite }];
         }
         break;
