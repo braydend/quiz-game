@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/braydend/quiz-game/src/player"
 	"github.com/braydend/quiz-game/src/pokeapi"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 )
 
 // TODO: Move to game struct
-var clients map[*websocket.Conn]*player
+var clients map[*websocket.Conn]*player.Player
 var selectedAbility *pokeapi.AbilityResult
 var guessedPokemon map[string]bool
 
@@ -61,7 +61,7 @@ func getPort() string {
 }
 
 func main() {
-	clients = make(map[*websocket.Conn]*player)
+	clients = make(map[*websocket.Conn]*player.Player)
 
 	app := fiber.New()
 
@@ -86,9 +86,9 @@ func main() {
 		_, isExistingConnection := clients[c]
 
 		if !isExistingConnection {
-			p := newPlayer()
+			p := player.NewPlayer(c)
 			clients[c] = &p
-			handleUpdateName(c, p.name)
+			handleSync(c)
 		}
 
 		messageHandler(c)
@@ -138,7 +138,7 @@ func messageHandler(c *websocket.Conn) {
 		} else if message.Command == "GUESS" {
 			handleGuess(c, message)
 		} else {
-			signedMsg := fmt.Sprintf("%s: %s", player.name, msg)
+			signedMsg := fmt.Sprintf("%s: %s", player.Name(), msg)
 			broadcast(mt, []byte(signedMsg))
 		}
 	}
@@ -156,15 +156,6 @@ func broadcast(mt int, msg []byte) {
 	}
 }
 
-/*
-Send a message to a specific client
-*/
-func directMessage(c *websocket.Conn, mt int, msg []byte) {
-	if err := c.WriteMessage(mt, msg); err != nil {
-		log.Println("write:", err)
-	}
-}
-
 func getPayloadAsBool(msg Message) bool {
 	return msg.Payload.(bool)
 }
@@ -176,7 +167,7 @@ func getPayloadAsString(msg Message) string {
 func sendUpdateLeaderboardCommandBroad() {
 	leaderboard := []playerDataPayload{}
 	for _, player := range clients {
-		leaderboard = append(leaderboard, playerDataPayload{Id: player.id, Name: player.name, Score: player.score})
+		leaderboard = append(leaderboard, playerDataPayload{Id: player.Id(), Name: player.Name(), Score: player.Score()})
 	}
 
 	updateLeaderboardCommand := Message{Command: SYS_UPDATE_LEADERBOARD, Payload: updateLeaderboardPayload{
@@ -194,7 +185,7 @@ func sendUpdateLeaderboardCommandBroad() {
 func sendUpdateLeaderboardCommandDirect(c *websocket.Conn) {
 	leaderboard := []playerDataPayload{}
 	for _, player := range clients {
-		leaderboard = append(leaderboard, playerDataPayload{Id: player.id, Name: player.name, Score: player.score})
+		leaderboard = append(leaderboard, playerDataPayload{Id: player.Id(), Name: player.Name(), Score: player.Score()})
 	}
 
 	updateLeaderboardCommand := Message{Command: SYS_UPDATE_LEADERBOARD, Payload: updateLeaderboardPayload{
@@ -206,7 +197,8 @@ func sendUpdateLeaderboardCommandDirect(c *websocket.Conn) {
 		log.Printf("Failed to marshal update leaderboard command")
 	}
 
-	directMessage(c, websocket.TextMessage, updateLeaderboardCommandBytes)
+	player := clients[c]
+	player.DirectMessage(updateLeaderboardCommandBytes)
 }
 
 func sendNewPromptCommandBroad() {
@@ -229,41 +221,42 @@ func sendNewPromptCommandDirect(c *websocket.Conn) {
 		log.Printf("Failed to marshal update name command")
 	}
 
-	directMessage(c, websocket.TextMessage, newPromptCommandBytes)
+	player := clients[c]
+	player.DirectMessage(newPromptCommandBytes)
 }
 
 func sendUpdateNameCommand(c *websocket.Conn) {
 	player := clients[c]
-	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: player.name}
+	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: player.Name()}
 	updateNameCommandBytes, err := json.Marshal(updateNameCommand)
 
 	if err != nil {
 		log.Printf("Failed to marshal update name command")
 	}
-	directMessage(c, websocket.TextMessage, updateNameCommandBytes)
+	player.DirectMessage(updateNameCommandBytes)
 }
 
 func sendUpdateUserDataCommand(c *websocket.Conn) {
 	player := clients[c]
-	updateUserDataCommand := Message{Command: SYS_UPDATE_USER_DATA, Payload: playerDataPayload{Id: player.id, Name: player.name, Score: player.score}}
+	updateUserDataCommand := Message{Command: SYS_UPDATE_USER_DATA, Payload: playerDataPayload{Id: player.Id(), Name: player.Name(), Score: player.Score()}}
 	updateUserDataCommandBytes, err := json.Marshal(updateUserDataCommand)
 
 	if err != nil {
 		log.Printf("Failed to marshal update user details command")
 	}
-	directMessage(c, websocket.TextMessage, updateUserDataCommandBytes)
+	player.DirectMessage(updateUserDataCommandBytes)
 }
 
 func sendUpdateScoreCommand(c *websocket.Conn) {
 	player := clients[c]
-	updateScoreCommand := Message{Command: SYS_UPDATE_SCORE, Payload: strconv.Itoa(player.score)}
+	updateScoreCommand := Message{Command: SYS_UPDATE_SCORE, Payload: strconv.Itoa(player.Score())}
 	updateScoreCommandBytes, err := json.Marshal(updateScoreCommand)
 
 	if err != nil {
 		log.Printf("Failed to marshal update score command")
 	}
 
-	directMessage(c, websocket.TextMessage, updateScoreCommandBytes)
+	player.DirectMessage(updateScoreCommandBytes)
 }
 
 func sendCorrectAnswerCommandDirect(c *websocket.Conn, name string) {
@@ -274,7 +267,9 @@ func sendCorrectAnswerCommandDirect(c *websocket.Conn, name string) {
 	if err != nil {
 		log.Printf("Failed to marshal guess pokemon command")
 	}
-	directMessage(c, websocket.TextMessage, correctAnswerCommandBytes)
+
+	player := clients[c]
+	player.DirectMessage(correctAnswerCommandBytes)
 }
 
 func sendCorrectAnswerCommandBroad(name string) {
@@ -307,13 +302,6 @@ func handleSync(c *websocket.Conn) {
 GAME LOGIC
 */
 
-type player struct {
-	id      string
-	name    string
-	isReady bool
-	score   int
-}
-
 func handleGuess(c *websocket.Conn, msg Message) {
 	log.Printf("Guess %s", msg)
 	var validAnswers []string
@@ -327,10 +315,10 @@ func handleGuess(c *websocket.Conn, msg Message) {
 	for _, pokemon := range selectedAbility.Pokemon {
 		if strings.ToUpper(pokemon.Pokemon.Name) == strings.ToUpper(guess) {
 			if isGuessed := guessedPokemon[pokemon.Pokemon.Name]; !isGuessed {
-				player.increaseScore()
+				player.IncreaseScore()
 				guessedPokemon[pokemon.Pokemon.Name] = true
 				sendUpdateScoreCommand(c)
-				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.name, player.score)))
+				broadcast(websocket.TextMessage, []byte(fmt.Sprintf("%s guessed correctly! Their score is now: %d", player.Name(), player.Score())))
 				sendCorrectAnswerCommandBroad(pokemon.Pokemon.Name)
 				sendUpdateLeaderboardCommandBroad()
 			}
@@ -340,7 +328,7 @@ func handleGuess(c *websocket.Conn, msg Message) {
 
 func handleReady(c *websocket.Conn, isReady bool) {
 	player := clients[c]
-	player.setReady(isReady)
+	player.SetReady(isReady)
 
 	readyCommand := Message{Command: SYS_READY, Payload: isReady}
 	readyCommandBytes, err := json.Marshal(readyCommand)
@@ -349,15 +337,14 @@ func handleReady(c *websocket.Conn, isReady bool) {
 		log.Println("Unable to marshal ready command")
 	}
 
-	directMessage(c, websocket.TextMessage, readyCommandBytes)
+	player.DirectMessage(readyCommandBytes)
 
 	isAllReady := true
 
 	for _, player := range clients {
-		isAllReady = player.isReady && isAllReady
+		isAllReady = player.IsReady() && isAllReady
 	}
 
-	//TODO: remove
 	if isAllReady {
 		startGame()
 	}
@@ -365,7 +352,7 @@ func handleReady(c *websocket.Conn, isReady bool) {
 
 func handleUpdateName(c *websocket.Conn, newName string) {
 	player := clients[c]
-	player.setName(newName)
+	player.SetName(newName)
 
 	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: newName}
 	updateNameCommandBytes, err := json.Marshal(updateNameCommand)
@@ -373,30 +360,7 @@ func handleUpdateName(c *websocket.Conn, newName string) {
 	if err != nil {
 		log.Printf("Failed to marshal update name command")
 	}
-	directMessage(c, websocket.TextMessage, updateNameCommandBytes)
-}
-
-func newPlayer() player {
-	uuid, err := uuid.NewUUID()
-
-	if err != nil {
-		log.Fatalf("Failed to generate UUID")
-	}
-
-	id := uuid.String()
-	return player{id, id, false, 0}
-}
-
-func (p *player) setReady(isReady bool) {
-	p.isReady = isReady
-}
-
-func (p *player) increaseScore() {
-	p.score += 1
-}
-
-func (p *player) setName(name string) {
-	p.name = name
+	player.DirectMessage(updateNameCommandBytes)
 }
 
 func startGame() {
