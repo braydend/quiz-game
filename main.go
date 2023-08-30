@@ -3,14 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/braydend/quiz-game/src/pokeapi"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -18,7 +17,7 @@ import (
 
 // TODO: Move to game struct
 var clients map[*websocket.Conn]*player
-var selectedAbility *AbilityResult
+var selectedAbility *pokeapi.AbilityResult
 var guessedPokemon map[string]bool
 
 const SYS_READY = "SYS_READY"
@@ -208,7 +207,7 @@ func sendUpdateScoreCommand(c *websocket.Conn) {
 }
 
 func sendCorrectAnswerCommandDirect(c *websocket.Conn, name string) {
-	pokemonData := getPokemon(name)
+	pokemonData := pokeapi.GetPokemonByName(name)
 	correctAnswerCommand := Message{Command: SYS_CORRECT_ANSWER, Payload: CorrectAnswerPayload{Name: pokemonData.Name, Sprite: pokemonData.Sprites.FrontDefault}}
 	correctAnswerCommandBytes, err := json.Marshal(correctAnswerCommand)
 
@@ -219,7 +218,7 @@ func sendCorrectAnswerCommandDirect(c *websocket.Conn, name string) {
 }
 
 func sendCorrectAnswerCommandBroad(name string) {
-	pokemonData := getPokemon(name)
+	pokemonData := pokeapi.GetPokemonByName(name)
 	correctAnswerCommand := Message{Command: SYS_CORRECT_ANSWER, Payload: CorrectAnswerPayload{Name: pokemonData.Name, Sprite: pokemonData.Sprites.FrontDefault}}
 	correctAnswerCommandBytes, err := json.Marshal(correctAnswerCommand)
 
@@ -336,13 +335,13 @@ func startGame() {
 }
 
 func selectNewPrompt() {
-	data := getAbilities()
+	data := pokeapi.GetAllAbilities()
 
 	i := rand.Intn(len(data.Results))
 
 	randomAbility := data.Results[i]
 
-	ability := getAbility(randomAbility.Name)
+	ability := pokeapi.GetAbilityByName(randomAbility.Name)
 	selectedAbility = &ability
 	for _, pokemon := range ability.Pokemon {
 		guessedPokemon[pokemon.Pokemon.Name] = false
@@ -351,116 +350,116 @@ func selectNewPrompt() {
 	sendNewPromptCommandBroad()
 }
 
-/**
- API LOGIC
-**/
+// /**
+//  API LOGIC
+// **/
 
-type AbilitiesResult struct {
-	Name string `json:"name"`
-	Url  string `json:"url"`
-}
+// type AbilitiesResult struct {
+// 	Name string `json:"name"`
+// 	Url  string `json:"url"`
+// }
 
-type AbilitiesResponse struct {
-	Count   int               `json:"count"`
-	Results []AbilitiesResult `json:"results"`
-}
+// type AbilitiesResponse struct {
+// 	Count   int               `json:"count"`
+// 	Results []AbilitiesResult `json:"results"`
+// }
 
-func getAbilities() AbilitiesResponse {
-	resp, err := http.Get("https://pokeapi.co/api/v2/ability?limit=500")
+// func getAbilities() AbilitiesResponse {
+// 	resp, err := http.Get("https://pokeapi.co/api/v2/ability?limit=500")
 
-	if err != nil {
-		log.Printf("Unable to lookup abilities. %s\n", err)
-	}
+// 	if err != nil {
+// 		log.Printf("Unable to lookup abilities. %s\n", err)
+// 	}
 
-	var data AbilitiesResponse
+// 	var data AbilitiesResponse
 
-	respBytes, err := io.ReadAll(resp.Body)
+// 	respBytes, err := io.ReadAll(resp.Body)
 
-	if err != nil {
-		log.Printf("Unable to parse abilities response. %s\n", err)
-	}
+// 	if err != nil {
+// 		log.Printf("Unable to parse abilities response. %s\n", err)
+// 	}
 
-	log.Printf("%s", respBytes)
+// 	log.Printf("%s", respBytes)
 
-	err = json.Unmarshal(respBytes, &data)
-	if err != nil {
-		log.Printf("Unable to parse abilities. %s\n", err)
-	}
+// 	err = json.Unmarshal(respBytes, &data)
+// 	if err != nil {
+// 		log.Printf("Unable to parse abilities. %s\n", err)
+// 	}
 
-	return data
-}
+// 	return data
+// }
 
-type PokemonAbility struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
+// type PokemonAbility struct {
+// 	Name string `json:"name"`
+// 	URL  string `json:"url"`
+// }
 
-type AbilityData struct {
-	Pokemon PokemonAbility `json:"pokemon"`
-}
+// type AbilityData struct {
+// 	Pokemon PokemonAbility `json:"pokemon"`
+// }
 
-type AbilityResult struct {
-	Id      string        `json:"id"`
-	Name    string        `json:"name"`
-	Pokemon []AbilityData `json:"pokemon"`
-}
+// type AbilityResult struct {
+// 	Id      string        `json:"id"`
+// 	Name    string        `json:"name"`
+// 	Pokemon []AbilityData `json:"pokemon"`
+// }
 
-func getAbility(name string) AbilityResult {
-	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/ability/%s", name))
+// func getAbility(name string) AbilityResult {
+// 	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/ability/%s", name))
 
-	if err != nil {
-		log.Printf("Unable to lookup ability (%s). %s\n", name, err)
-	}
+// 	if err != nil {
+// 		log.Printf("Unable to lookup ability (%s). %s\n", name, err)
+// 	}
 
-	var data AbilityResult
+// 	var data AbilityResult
 
-	respBytes, err := io.ReadAll(resp.Body)
+// 	respBytes, err := io.ReadAll(resp.Body)
 
-	if err != nil {
-		log.Printf("Unable to parse ability (%s) response. %s\n", name, err)
-	}
+// 	if err != nil {
+// 		log.Printf("Unable to parse ability (%s) response. %s\n", name, err)
+// 	}
 
-	log.Printf("%s", respBytes)
+// 	log.Printf("%s", respBytes)
 
-	err = json.Unmarshal(respBytes, &data)
-	if err != nil {
-		log.Printf("Unable to parse ability (%s). %s\n", name, err)
-	}
+// 	err = json.Unmarshal(respBytes, &data)
+// 	if err != nil {
+// 		log.Printf("Unable to parse ability (%s). %s\n", name, err)
+// 	}
 
-	return data
-}
+// 	return data
+// }
 
-type PokemonSprite struct {
-	FrontDefault string `json:"front_default"`
-}
+// type PokemonSprite struct {
+// 	FrontDefault string `json:"front_default"`
+// }
 
-type PokemonResult struct {
-	Id      int           `json:"id"`
-	Name    string        `json:"name"`
-	Sprites PokemonSprite `json:"sprites"`
-}
+// type PokemonResult struct {
+// 	Id      int           `json:"id"`
+// 	Name    string        `json:"name"`
+// 	Sprites PokemonSprite `json:"sprites"`
+// }
 
-func getPokemon(name string) PokemonResult {
-	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", name))
+// func getPokemon(name string) PokemonResult {
+// 	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", name))
 
-	if err != nil {
-		log.Printf("Unable to lookup pokemon (%s). %s\n", name, err)
-	}
+// 	if err != nil {
+// 		log.Printf("Unable to lookup pokemon (%s). %s\n", name, err)
+// 	}
 
-	var data PokemonResult
+// 	var data PokemonResult
 
-	respBytes, err := io.ReadAll(resp.Body)
+// 	respBytes, err := io.ReadAll(resp.Body)
 
-	if err != nil {
-		log.Printf("Unable to parse pokemon (%s) response. %s\n", name, err)
-	}
+// 	if err != nil {
+// 		log.Printf("Unable to parse pokemon (%s) response. %s\n", name, err)
+// 	}
 
-	log.Printf("%s", respBytes)
+// 	log.Printf("%s", respBytes)
 
-	err = json.Unmarshal(respBytes, &data)
-	if err != nil {
-		log.Printf("Unable to parse pokemon (%s). %s\n", name, err)
-	}
+// 	err = json.Unmarshal(respBytes, &data)
+// 	if err != nil {
+// 		log.Printf("Unable to parse pokemon (%s). %s\n", name, err)
+// 	}
 
-	return data
-}
+// 	return data
+// }
