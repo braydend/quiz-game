@@ -44,17 +44,6 @@
     websocket.send(msg);
   };
 
-  // const parseCommand = (msg: string): { command: string; payload?: string } => {
-  //   if (!msg.includes(":")) {
-  //     return { command: msg };
-  //   }
-  //   const splits = msg.split(":");
-  //   const command = splits[0].trim();
-  //   const payload = splits[1].trim();
-
-  //   return { command, payload };
-  // };
-
   const handleSystemMessage = (msg: Message) => {
     const { command, payload } = msg;
 
@@ -68,13 +57,11 @@
         name = payload ?? name;
         break;
       case "SYS_CORRECT_ANSWER":
-        if (payload) {
-          // const parsedPayload = JSON.parse(payload);
-          const parsedPayload = payload;
-          const { name, sprite } = parsedPayload;
-          console.log("correct answer:", parsedPayload);
-          correctAnswers = [...correctAnswers, { name, sprite }];
-        }
+        // const parsedPayload = JSON.parse(payload);
+        const parsedPayload = payload;
+        const { name, sprite } = parsedPayload;
+        console.log("correct answer:", parsedPayload);
+        correctAnswers = [...correctAnswers, { name, sprite }];
         break;
       case "SYS_UPDATE_SCORE":
         score = Number(payload) ?? score;
