@@ -20,8 +20,8 @@
   var messages: Message[] = [];
   var msg: string;
   var isReady = false;
-  $: prompt = "";
-  $: correctAnswers = new Array<PokemonData>();
+  $: prompt = { prompt: "", total: 0, remaining: 0 };
+  const correctAnswers: { [key: string]: string } = {};
   $: score = 0;
 
   onMount(() => {
@@ -75,14 +75,18 @@
           // const parsedPayload = JSON.parse(payload);
           const parsedPayload = payload;
           const { name, sprite } = parsedPayload;
-          correctAnswers = [...correctAnswers, { name, sprite }];
+          correctAnswers[name] = sprite;
         }
         break;
       case "SYS_UPDATE_SCORE":
         score = Number(payload) ?? score;
         break;
-      case "SYS_NEW_PROMPT":
-        prompt = payload;
+      case "SYS_PROMPT":
+        prompt = {
+          prompt: payload.prompt,
+          total: payload.totalAnswers,
+          remaining: payload.remainingAnswers,
+        };
         break;
       case "SYS_UPDATE_LEADERBOARD":
         store.leaderboard.set(payload.scores);
@@ -105,13 +109,13 @@
 <main>
   <Name />
   <Leaderboard />
-  <h2>{prompt}</h2>
+  <h2>{prompt.prompt} {prompt.remaining}/{prompt.total}</h2>
   <div>
-    {#each correctAnswers as correctAnswer}
+    {#each Object.entries(correctAnswers) as [name, sprite]}
       <div class="correctAnswer">
         <img
-          alt={correctAnswer.name}
-          src={correctAnswer.sprite}
+          alt={name}
+          src={sprite}
           width="128"
           height="128"
           in:fade={{ duration: 3000 }}

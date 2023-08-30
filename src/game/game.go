@@ -127,7 +127,22 @@ func (g *Game) broadcastLeaderboard() {
 }
 
 func (g *Game) broadcastPrompt() {
-	newPromptCommand := message.Message{Command: message.SYS_NEW_PROMPT, Payload: g.selectedAbility.Name}
+	remainingAnswersCount := 0
+
+	for _, isGuessed := range g.guessedPokemon {
+		if isGuessed {
+			remainingAnswersCount += 1
+		}
+	}
+
+	newPromptCommand := message.Message{
+		Command: message.SYS_PROMPT,
+		Payload: message.PromptPayload{
+			Prompt:           g.selectedAbility.Name,
+			TotalAnswers:     len(g.selectedAbility.Pokemon),
+			RemainingAnswers: remainingAnswersCount,
+		},
+	}
 	g.Broadcast(message.MarshalMessage(newPromptCommand))
 }
 
@@ -196,6 +211,7 @@ func (g *Game) handleGuess(c *websocket.Conn, msg message.Message) {
 				player.SendUpdateScoreCommand()
 				g.broadcastCorrectAnswer(pokemon.Pokemon.Name)
 				g.broadcastLeaderboard()
+				g.broadcastPrompt()
 			}
 		}
 	}
