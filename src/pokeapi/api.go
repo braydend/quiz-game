@@ -33,8 +33,6 @@ func GetAllAbilities() AbilitiesResponse {
 		log.Printf("Unable to parse abilities response. %s\n", err)
 	}
 
-	log.Printf("%s", respBytes)
-
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		log.Printf("Unable to parse abilities. %s\n", err)
@@ -73,8 +71,6 @@ func GetAbilityByName(name string) AbilityResult {
 		log.Printf("Unable to parse ability (%s) response. %s\n", name, err)
 	}
 
-	log.Printf("%s", respBytes)
-
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		log.Printf("Unable to parse ability (%s). %s\n", name, err)
@@ -107,8 +103,6 @@ func GetPokemonByName(name string) PokemonResult {
 	if err != nil {
 		log.Printf("Unable to parse pokemon (%s) response. %s\n", name, err)
 	}
-
-	log.Printf("%s", respBytes)
 
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {

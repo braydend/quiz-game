@@ -3,10 +3,11 @@
   import { fade } from "svelte/transition";
   import Name from "./components/Name.svelte";
   import { store } from "./store/appStore";
+  import Leaderboard from "./components/Leaderboard.svelte";
 
   type Message = {
     command: string;
-    payload: any;
+    payload?: any;
   };
 
   type PokemonData = {
@@ -38,12 +39,12 @@
     };
 
     websocket.addEventListener("open", () => {
-      websocket.send("SYS_SYNC");
+      handleSend({ command: "SYS_SYNC" });
     });
   });
 
-  const handleSend = (msg: string) => {
-    websocket.send(msg);
+  const handleSend = (msg: Message) => {
+    websocket?.send(JSON.stringify(msg));
   };
 
   // const parseCommand = (msg: string): { command: string; payload?: string } => {
@@ -84,32 +85,31 @@
       case "SYS_NEW_PROMPT":
         prompt = payload;
         break;
+      case "SYS_UPDATE_LEADERBOARD":
+        store.leaderboard.set(payload.scores);
+        break;
+      case "SYS_UPDATE_USER_DATA":
+        store.id.set(payload.id);
+        store.name.set(payload.name);
+        break;
       default:
         console.error(`Unknown system command: ${msg}`);
     }
   };
 
   store.name.subscribe((updatedName) => {
-    websocket?.send(
-      JSON.stringify({ command: "SYS_UPDATE_NAME", payload: updatedName })
-    );
+    console.log("name updated", updatedName);
+    handleSend({ command: "SYS_UPDATE_NAME", payload: updatedName });
   });
 </script>
 
 <main>
   <Name />
-  <span>score: {score}</span>
+  <Leaderboard />
   <h2>{prompt}</h2>
   <div>
     {#each correctAnswers as correctAnswer}
       <div class="correctAnswer">
-        <!-- <img
-          alt="pokeball"
-          src="/pokeball.png"
-          width="64"
-          height="64"
-          out:fade={{ duration: 0, delay: 1000 }}
-        /> -->
         <img
           alt={correctAnswer.name}
           src={correctAnswer.sprite}
@@ -126,8 +126,11 @@
     {/each}
   </ul>
   <input bind:value={msg} type="text" />
-  <button on:click={() => handleSend(msg)}>Send</button>
-  <button on:click={() => handleSend("SYS_READY")}
+  <button on:click={() => handleSend({ command: "GUESS", payload: msg })}
+    >Send</button
+  >
+  <button
+    on:click={() => handleSend({ command: "SYS_READY", payload: !isReady })}
     >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
   >
 </main>
