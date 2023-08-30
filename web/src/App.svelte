@@ -4,25 +4,26 @@
   import Name from "./components/Name.svelte";
   import { store } from "./store/appStore";
   import Leaderboard from "./components/Leaderboard.svelte";
+  import Timer from "./components/Timer.svelte";
+  import type { Prompt } from "./types";
 
   type Message = {
     command: string;
     payload?: any;
   };
 
-  type PokemonData = {
-    name: string;
-    sprite: string;
-  };
+  let websocket: WebSocket;
 
-  var websocket: WebSocket;
-
-  var messages: Message[] = [];
-  var msg: string;
-  var isReady = false;
-  $: prompt = { prompt: "", total: 0, remaining: 0 };
+  let messages: Message[] = [];
+  let msg: string;
+  let isReady = false;
   const correctAnswers: { [key: string]: string } = {};
+  let currentPrompt: Prompt;
   $: score = 0;
+
+  store.prompt.subscribe((p) => {
+    currentPrompt = p;
+  });
 
   onMount(() => {
     websocket = new WebSocket(`wss://${location.host}/ws/join`);
@@ -47,17 +48,6 @@
     websocket?.send(JSON.stringify(msg));
   };
 
-  // const parseCommand = (msg: string): { command: string; payload?: string } => {
-  //   if (!msg.includes(":")) {
-  //     return { command: msg };
-  //   }
-  //   const splits = msg.split(":");
-  //   const command = splits[0].trim();
-  //   const payload = splits[1].trim();
-
-  //   return { command, payload };
-  // };
-
   const handleSystemMessage = (msg: Message) => {
     const { command, payload } = msg;
 
@@ -72,7 +62,6 @@
         break;
       case "SYS_CORRECT_ANSWER":
         if (payload) {
-          // const parsedPayload = JSON.parse(payload);
           const parsedPayload = payload;
           const { name, sprite } = parsedPayload;
           correctAnswers[name] = sprite;
@@ -82,11 +71,11 @@
         score = Number(payload) ?? score;
         break;
       case "SYS_PROMPT":
-        prompt = {
+        store.prompt.set({
           prompt: payload.prompt,
           total: payload.totalAnswers,
           remaining: payload.remainingAnswers,
-        };
+        });
         break;
       case "SYS_UPDATE_LEADERBOARD":
         store.leaderboard.set(payload.scores);
@@ -107,9 +96,17 @@
 </script>
 
 <main>
+  <Timer />
   <Name />
   <Leaderboard />
-  <h2>{prompt.prompt} {prompt.remaining}/{prompt.total}</h2>
+  <h2>
+    {#if currentPrompt}
+      {currentPrompt.prompt}
+      {currentPrompt.remaining}/{currentPrompt.total}
+    {:else}
+      Are you ready?
+    {/if}
+  </h2>
   <div>
     {#each Object.entries(correctAnswers) as [name, sprite]}
       <div class="correctAnswer">
