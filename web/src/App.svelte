@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
+  import Name from "./components/Name.svelte";
+  import { store } from "./store/appStore";
 
   type Message = {
     command: string;
@@ -19,7 +21,6 @@
   var isReady = false;
   $: prompt = "";
   $: correctAnswers = new Array<PokemonData>();
-  $: name = "";
   $: score = 0;
 
   onMount(() => {
@@ -67,8 +68,7 @@
         isReady = command === "SYS_READY";
         break;
       case "SYS_UPDATE_NAME":
-        console.log(payload);
-        name = payload ?? name;
+        store.name.set(payload);
         break;
       case "SYS_CORRECT_ANSWER":
         if (payload) {
@@ -88,10 +88,16 @@
         console.error(`Unknown system command: ${msg}`);
     }
   };
+
+  store.name.subscribe((updatedName) => {
+    websocket?.send(
+      JSON.stringify({ command: "SYS_UPDATE_NAME", payload: updatedName })
+    );
+  });
 </script>
 
 <main>
-  <span>name: {name}</span>
+  <Name />
   <span>score: {score}</span>
   <h2>{prompt}</h2>
   <div>
