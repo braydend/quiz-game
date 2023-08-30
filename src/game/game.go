@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/braydend/quiz-game/src/message"
 	"github.com/braydend/quiz-game/src/player"
@@ -42,7 +43,15 @@ func (g *Game) Start() {
 	g.Broadcast([]byte("GAME STARTING"))
 	g.guessedPokemon = make(map[string]bool)
 
-	g.newRound()
+	roundTime := 32 * time.Second
+
+	timer := time.NewTimer(roundTime)
+	for i := 0; i < 10; i++ {
+		g.newRound()
+		<-timer.C
+		timer.Reset(roundTime)
+	}
+	g.Broadcast([]byte("GAME ENDING"))
 }
 
 /*
@@ -182,15 +191,19 @@ func (g *Game) handleReady(c *websocket.Conn, isReady bool) {
 	readyCommand := message.Message{Command: message.SYS_READY, Payload: isReady}
 	player.DirectMessage(message.MarshalMessage(readyCommand))
 
+	if g.isEveryoneReady() {
+		g.Start()
+	}
+}
+
+func (g *Game) isEveryoneReady() bool {
 	isAllReady := true
 
 	for _, player := range g.clients {
 		isAllReady = player.IsReady() && isAllReady
 	}
 
-	if isAllReady {
-		g.Start()
-	}
+	return isAllReady
 }
 
 func (g *Game) handleGuess(c *websocket.Conn, msg message.Message) {
