@@ -173,13 +173,7 @@ func sendUpdateLeaderboardCommandBroad() {
 	updateLeaderboardCommand := Message{Command: SYS_UPDATE_LEADERBOARD, Payload: updateLeaderboardPayload{
 		Scores: leaderboard,
 	}}
-	updateLeaderboardCommandBytes, err := json.Marshal(updateLeaderboardCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update leaderboard command")
-	}
-
-	broadcast(websocket.TextMessage, updateLeaderboardCommandBytes)
+	broadcast(websocket.TextMessage, marshalMessage(updateLeaderboardCommand))
 }
 
 func sendUpdateLeaderboardCommandDirect(c *websocket.Conn) {
@@ -191,96 +185,51 @@ func sendUpdateLeaderboardCommandDirect(c *websocket.Conn) {
 	updateLeaderboardCommand := Message{Command: SYS_UPDATE_LEADERBOARD, Payload: updateLeaderboardPayload{
 		Scores: leaderboard,
 	}}
-	updateLeaderboardCommandBytes, err := json.Marshal(updateLeaderboardCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update leaderboard command")
-	}
-
 	player := clients[c]
-	player.DirectMessage(updateLeaderboardCommandBytes)
+	player.DirectMessage(marshalMessage(updateLeaderboardCommand))
 }
 
 func sendNewPromptCommandBroad() {
 	newPromptCommand := Message{Command: SYS_NEW_PROMPT, Payload: selectedAbility.Name}
-	newPromptCommandBytes, err := json.Marshal(newPromptCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update name command")
-	}
-
-	broadcast(websocket.TextMessage, newPromptCommandBytes)
+	broadcast(websocket.TextMessage, marshalMessage(newPromptCommand))
 }
 
 // TODO: Change to UPDATE_PROMPT
 func sendNewPromptCommandDirect(c *websocket.Conn) {
 	newPromptCommand := Message{Command: SYS_NEW_PROMPT, Payload: selectedAbility.Name}
-	newPromptCommandBytes, err := json.Marshal(newPromptCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update name command")
-	}
-
 	player := clients[c]
-	player.DirectMessage(newPromptCommandBytes)
+	player.DirectMessage(marshalMessage(newPromptCommand))
 }
 
 func sendUpdateNameCommand(c *websocket.Conn) {
 	player := clients[c]
 	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: player.Name()}
-	updateNameCommandBytes, err := json.Marshal(updateNameCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update name command")
-	}
-	player.DirectMessage(updateNameCommandBytes)
+	player.DirectMessage(marshalMessage(updateNameCommand))
 }
 
 func sendUpdateUserDataCommand(c *websocket.Conn) {
 	player := clients[c]
 	updateUserDataCommand := Message{Command: SYS_UPDATE_USER_DATA, Payload: playerDataPayload{Id: player.Id(), Name: player.Name(), Score: player.Score()}}
-	updateUserDataCommandBytes, err := json.Marshal(updateUserDataCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update user details command")
-	}
-	player.DirectMessage(updateUserDataCommandBytes)
+	player.DirectMessage(marshalMessage(updateUserDataCommand))
 }
 
 func sendUpdateScoreCommand(c *websocket.Conn) {
 	player := clients[c]
 	updateScoreCommand := Message{Command: SYS_UPDATE_SCORE, Payload: strconv.Itoa(player.Score())}
-	updateScoreCommandBytes, err := json.Marshal(updateScoreCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update score command")
-	}
-
-	player.DirectMessage(updateScoreCommandBytes)
+	player.DirectMessage(marshalMessage(updateScoreCommand))
 }
 
 func sendCorrectAnswerCommandDirect(c *websocket.Conn, name string) {
+	player := clients[c]
 	pokemonData := pokeapi.GetPokemonByName(name)
 	correctAnswerCommand := Message{Command: SYS_CORRECT_ANSWER, Payload: CorrectAnswerPayload{Name: pokemonData.Name, Sprite: pokemonData.Sprites.FrontDefault}}
-	correctAnswerCommandBytes, err := json.Marshal(correctAnswerCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal guess pokemon command")
-	}
-
-	player := clients[c]
-	player.DirectMessage(correctAnswerCommandBytes)
+	player.DirectMessage(marshalMessage(correctAnswerCommand))
 }
 
 func sendCorrectAnswerCommandBroad(name string) {
 	pokemonData := pokeapi.GetPokemonByName(name)
 	correctAnswerCommand := Message{Command: SYS_CORRECT_ANSWER, Payload: CorrectAnswerPayload{Name: pokemonData.Name, Sprite: pokemonData.Sprites.FrontDefault}}
-	correctAnswerCommandBytes, err := json.Marshal(correctAnswerCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal guess pokemon command")
-	}
-	broadcast(websocket.TextMessage, correctAnswerCommandBytes)
+	broadcast(websocket.TextMessage, marshalMessage(correctAnswerCommand))
 }
 
 func handleSync(c *websocket.Conn) {
@@ -331,13 +280,7 @@ func handleReady(c *websocket.Conn, isReady bool) {
 	player.SetReady(isReady)
 
 	readyCommand := Message{Command: SYS_READY, Payload: isReady}
-	readyCommandBytes, err := json.Marshal(readyCommand)
-
-	if err != nil {
-		log.Println("Unable to marshal ready command")
-	}
-
-	player.DirectMessage(readyCommandBytes)
+	player.DirectMessage(marshalMessage(readyCommand))
 
 	isAllReady := true
 
@@ -355,12 +298,7 @@ func handleUpdateName(c *websocket.Conn, newName string) {
 	player.SetName(newName)
 
 	updateNameCommand := Message{Command: SYS_UPDATE_NAME, Payload: newName}
-	updateNameCommandBytes, err := json.Marshal(updateNameCommand)
-
-	if err != nil {
-		log.Printf("Failed to marshal update name command")
-	}
-	player.DirectMessage(updateNameCommandBytes)
+	player.DirectMessage(marshalMessage(updateNameCommand))
 }
 
 func startGame() {
@@ -386,4 +324,14 @@ func selectNewPrompt() {
 	}
 
 	sendNewPromptCommandBroad()
+}
+
+func marshalMessage(msg Message) []byte {
+	command, err := json.Marshal(msg)
+
+	if err != nil {
+		log.Printf("Failed to marshal command: %v", msg)
+	}
+
+	return command
 }
