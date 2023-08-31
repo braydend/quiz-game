@@ -1,14 +1,16 @@
 import { writable } from "svelte/store";
-import type { PlayerScore, Prompt } from "../types";
+import type { PlayerScore, PromptProgress } from "../types";
 
 const name = writable("");
 const leaderboard = writable<PlayerScore[]>([])
 const id = writable("");
-const prompt = writable<Prompt>()
+const prompt = writable("")
+const promptProgress = writable<PromptProgress>()
 
 export const store = {
     id,
     name,
     leaderboard,
-    prompt
+    prompt,
+    promptProgress
 }

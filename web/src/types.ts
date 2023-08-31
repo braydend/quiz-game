@@ -1,5 +1,4 @@
-export type Prompt = {
-    prompt: string, 
+export type PromptProgress = {
     total: number, 
     remaining: number
 } | undefined;

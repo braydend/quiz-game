@@ -116,7 +116,7 @@ func (g *Game) syncClient(c *websocket.Conn) {
 	p.HandleSync()
 	g.broadcastLeaderboard()
 	if g.selectedAbility != nil {
-		g.broadcastPrompt()
+		g.broadcastPromptProgress()
 	}
 	for name, isGuessed := range g.guessedPokemon {
 		if isGuessed {
@@ -137,7 +137,7 @@ func (g *Game) broadcastLeaderboard() {
 	g.Broadcast(message.MarshalMessage(updateLeaderboardCommand))
 }
 
-func (g *Game) broadcastPrompt() {
+func (g *Game) broadcastPromptProgress() {
 	remainingAnswersCount := 0
 
 	for _, isGuessed := range g.guessedPokemon {
@@ -146,14 +146,18 @@ func (g *Game) broadcastPrompt() {
 		}
 	}
 
-	newPromptCommand := message.Message{
-		Command: message.SYS_PROMPT,
-		Payload: message.PromptPayload{
-			Prompt:           g.selectedAbility.Name,
+	newPromptProgressCommand := message.Message{
+		Command: message.SYS_PROMPT_PROGRESS,
+		Payload: message.PromptProgressPayload{
 			TotalAnswers:     len(g.selectedAbility.Pokemon),
 			RemainingAnswers: remainingAnswersCount,
 		},
 	}
+	g.Broadcast(message.MarshalMessage(newPromptProgressCommand))
+}
+
+func (g *Game) broadcastPrompt() {
+	newPromptCommand := message.Message{Command: message.SYS_PROMPT, Payload: g.selectedAbility.Name}
 	g.Broadcast(message.MarshalMessage(newPromptCommand))
 }
 
@@ -178,6 +182,7 @@ func (g *Game) newRound() {
 	}
 
 	g.broadcastPrompt()
+	g.broadcastPromptProgress()
 }
 
 func (g *Game) resetRound() {
@@ -233,7 +238,7 @@ func (g *Game) handleGuess(c *websocket.Conn, msg message.Message) {
 				player.SendUpdateScoreCommand()
 				g.broadcastCorrectAnswer(pokemon.Pokemon.Name)
 				g.broadcastLeaderboard()
-				g.broadcastPrompt()
+				g.broadcastPromptProgress()
 			}
 		}
 	}

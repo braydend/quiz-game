@@ -5,7 +5,7 @@
   import { store } from "./store/appStore";
   import Leaderboard from "./components/Leaderboard.svelte";
   import Timer from "./components/Timer.svelte";
-  import type { Prompt } from "./types";
+  import type { PromptProgress } from "./types";
 
   type Message = {
     command: string;
@@ -17,12 +17,17 @@
   let messages: Message[] = [];
   let msg: string;
   let isReady = false;
-  const correctAnswers: { [key: string]: string } = {};
-  let currentPrompt: Prompt;
+  let correctAnswers: { [key: string]: string } = {};
+  let currentPrompt: string;
+  let currentPromptProgress: PromptProgress;
   $: score = 0;
 
   store.prompt.subscribe((p) => {
     currentPrompt = p;
+    correctAnswers = {};
+  });
+  store.promptProgress.subscribe((p) => {
+    currentPromptProgress = p;
   });
 
   onMount(() => {
@@ -71,14 +76,16 @@
         score = Number(payload) ?? score;
         break;
       case "SYS_CLEAR_PROMPT":
-        store.prompt.set(undefined);
+        store.prompt.set("");
         break;
-      case "SYS_PROMPT":
-        store.prompt.set({
-          prompt: payload.prompt,
+      case "SYS_PROMPT_PROGRESS":
+        store.promptProgress.set({
           total: payload.totalAnswers,
           remaining: payload.remainingAnswers,
         });
+        break;
+      case "SYS_PROMPT":
+        store.prompt.set(payload);
         break;
       case "SYS_UPDATE_LEADERBOARD":
         store.leaderboard.set(payload.scores);
@@ -93,7 +100,6 @@
   };
 
   store.name.subscribe((updatedName) => {
-    console.log("name updated", updatedName);
     handleSend({ command: "SYS_UPDATE_NAME", payload: updatedName });
   });
 </script>
@@ -103,9 +109,9 @@
   <Name />
   <Leaderboard />
   <h2>
-    {#if currentPrompt}
-      {currentPrompt.prompt}
-      {currentPrompt.remaining}/{currentPrompt.total}
+    {#if currentPrompt && currentPromptProgress}
+      {currentPrompt}
+      {currentPromptProgress.remaining}/{currentPromptProgress.total}
     {:else}
       Are you ready?
     {/if}
