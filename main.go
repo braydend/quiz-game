@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/braydend/quiz-game/src/game"
@@ -21,7 +22,7 @@ func getPort() string {
 
 func main() {
 	app := fiber.New()
-	game := game.NewGame()
+	games := make(map[string]game.Game)
 
 	app.Static("/", "./web/dist/")
 
@@ -40,9 +41,28 @@ func main() {
 		Joins connection pool
 		TODO: put a room/game ID in the url as a param
 	*/
-	app.Get("/ws/join", websocket.New(func(c *websocket.Conn) {
+	app.Get("/ws/join/:id", websocket.New(func(c *websocket.Conn) {
+		id := c.Params("id")
+
+		game, ok := games[id]
+
+		if !ok {
+			c.WriteMessage(websocket.CloseMessage, []byte(fmt.Sprintf("Unable to find game with the ID: %s", id)))
+			return
+		}
+
 		game.AddClient(c)
 	}))
+
+	app.Get("/create/:id", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		games[id] = game.NewGame()
+		return nil
+	})
+
+	app.Get("/games", func(c *fiber.Ctx) error {
+		return c.JSON(games)
+	})
 
 	app.Listen(getPort())
 }
