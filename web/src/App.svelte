@@ -70,6 +70,9 @@
       case "SYS_UPDATE_SCORE":
         score = Number(payload) ?? score;
         break;
+      case "SYS_CLEAR_PROMPT":
+        store.prompt.set(undefined);
+        break;
       case "SYS_PROMPT":
         store.prompt.set({
           prompt: payload.prompt,

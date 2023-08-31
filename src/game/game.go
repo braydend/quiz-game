@@ -52,8 +52,8 @@ func (g *Game) Start() {
 			<-timer.C
 			timer.Reset(roundTime)
 		}
+		g.resetRound()
 	}()
-	g.Broadcast([]byte("GAME ENDING"))
 }
 
 /*
@@ -178,6 +178,13 @@ func (g *Game) newRound() {
 	}
 
 	g.broadcastPrompt()
+}
+
+func (g *Game) resetRound() {
+	g.selectedAbility = nil
+	g.guessedPokemon = make(map[string]bool)
+
+	g.Broadcast(message.MarshalMessage(message.Message{Command: message.SYS_CLEAR_PROMPT}))
 }
 
 func (g *Game) handleUpdateName(c *websocket.Conn, newName string) {
