@@ -15,9 +15,10 @@ import (
 )
 
 type Game struct {
-	clients         map[*websocket.Conn]*player.Player
-	selectedAbility *pokeapi.AbilityResult
-	guessedPokemon  map[string]bool
+	clients map[*websocket.Conn]*player.Player
+	// selectedAbility *pokeapi.AbilityResult
+	selectedMove   *pokeapi.MoveResult
+	guessedPokemon map[string]bool
 }
 
 func NewGame() Game {
@@ -115,7 +116,8 @@ func (g *Game) syncClient(c *websocket.Conn) {
 	p := g.clients[c]
 	p.HandleSync()
 	g.broadcastLeaderboard()
-	if g.selectedAbility != nil {
+	// if g.selectedAbility != nil {
+	if g.selectedMove != nil {
 		g.broadcastPromptProgress()
 	}
 	for name, isGuessed := range g.guessedPokemon {
@@ -149,7 +151,8 @@ func (g *Game) broadcastPromptProgress() {
 	newPromptProgressCommand := message.Message{
 		Command: message.SYS_PROMPT_PROGRESS,
 		Payload: message.PromptProgressPayload{
-			TotalAnswers:     len(g.selectedAbility.Pokemon),
+			// TotalAnswers:     len(g.selectedAbility.Pokemon),
+			TotalAnswers:     len(g.selectedMove.Pokemon),
 			RemainingAnswers: remainingAnswersCount,
 		},
 	}
@@ -157,7 +160,8 @@ func (g *Game) broadcastPromptProgress() {
 }
 
 func (g *Game) broadcastPrompt() {
-	newPromptCommand := message.Message{Command: message.SYS_PROMPT, Payload: g.selectedAbility.Name}
+	newPromptCommand := message.Message{Command: message.SYS_PROMPT, Payload: g.selectedMove.Name}
+	// newPromptCommand := message.Message{Command: message.SYS_PROMPT, Payload: g.selectedAbility.Name}
 	g.Broadcast(message.MarshalMessage(newPromptCommand))
 }
 
@@ -168,23 +172,30 @@ func (g *Game) broadcastCorrectAnswer(name string) {
 }
 
 func (g *Game) newRound() {
-	data := pokeapi.GetAllAbilities()
+	data := pokeapi.GetAllMoves()
+	// data := pokeapi.GetAllAbilities()
 
 	i := rand.Intn(len(data.Results))
 
-	randomAbility := data.Results[i]
+	randomItem := data.Results[i]
 
-	ability := pokeapi.GetAbilityByName(randomAbility.Name)
+	// ability := pokeapi.GetAbilityByName(randomAbility.Name)
+	move := pokeapi.GetMoveByName(randomItem.Name)
 
-	for len(ability.Pokemon) < 5 {
+	for len(move.Pokemon) < 5 {
+		// for len(ability.Pokemon) < 5 {
 		randomAbility := data.Results[rand.Intn(len(data.Results))]
-		ability = pokeapi.GetAbilityByName(randomAbility.Name)
+		move = pokeapi.GetMoveByName(randomAbility.Name)
+		// ability = pokeapi.GetMoveByName(randomAbility.Name)
 	}
 
-	g.selectedAbility = &ability
+	g.selectedMove = &move
+	// g.selectedAbility = &ability
 	g.guessedPokemon = make(map[string]bool)
-	for _, pokemon := range ability.Pokemon {
-		g.guessedPokemon[pokemon.Pokemon.Name] = false
+	for _, pokemon := range move.Pokemon {
+		// for _, pokemon := range ability.Pokemon {
+		// g.guessedPokemon[pokemon.Pokemon.Name] = false
+		g.guessedPokemon[pokemon.Name] = false
 	}
 
 	g.broadcastPrompt()
@@ -192,7 +203,8 @@ func (g *Game) newRound() {
 }
 
 func (g *Game) resetRound() {
-	g.selectedAbility = nil
+	g.selectedMove = nil
+	// g.selectedAbility = nil
 	g.guessedPokemon = make(map[string]bool)
 
 	g.Broadcast(message.MarshalMessage(message.Message{Command: message.SYS_CLEAR_PROMPT}))
@@ -229,20 +241,27 @@ func (g *Game) isEveryoneReady() bool {
 func (g *Game) handleGuess(c *websocket.Conn, msg message.Message) {
 	log.Printf("Guess %s", msg)
 	var validAnswers []string
-	for _, pokemon := range g.selectedAbility.Pokemon {
-		validAnswers = append(validAnswers, pokemon.Pokemon.Name)
+	for _, pokemon := range g.selectedMove.Pokemon {
+		// for _, pokemon := range g.selectedAbility.Pokemon {
+		validAnswers = append(validAnswers, pokemon.Name)
+		// validAnswers = append(validAnswers, pokemon.Pokemon.Name)
 	}
 	log.Printf("Valid answers: %s", strings.Join(validAnswers, ","))
 	guess := message.GetPayloadAsString(msg)
 	player := g.clients[c]
 
-	for _, pokemon := range g.selectedAbility.Pokemon {
-		if strings.ToUpper(pokemon.Pokemon.Name) == strings.ToUpper(guess) {
-			if isGuessed := g.guessedPokemon[pokemon.Pokemon.Name]; !isGuessed {
+	// for _, pokemon := range g.selectedAbility.Pokemon {
+	for _, pokemon := range g.selectedMove.Pokemon {
+		// if strings.ToUpper(pokemon.Pokemon.Name) == strings.ToUpper(guess) {
+		if strings.ToUpper(pokemon.Name) == strings.ToUpper(guess) {
+			// if isGuessed := g.guessedPokemon[pokemon.Pokemon.Name]; !isGuessed {
+			if isGuessed := g.guessedPokemon[pokemon.Name]; !isGuessed {
 				player.IncreaseScore()
-				g.guessedPokemon[pokemon.Pokemon.Name] = true
+				g.guessedPokemon[pokemon.Name] = true
+				// g.guessedPokemon[pokemon.Pokemon.Name] = true
 				player.SendUpdateScoreCommand()
-				g.broadcastCorrectAnswer(pokemon.Pokemon.Name)
+				g.broadcastCorrectAnswer(pokemon.Name)
+				// g.broadcastCorrectAnswer(pokemon.Pokemon.Name)
 				g.broadcastLeaderboard()
 				g.broadcastPromptProgress()
 			}

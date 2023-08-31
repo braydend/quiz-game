@@ -18,6 +18,39 @@ type AbilitiesResponse struct {
 	Results []AbilitiesResult `json:"results"`
 }
 
+type MovesResult struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
+}
+
+type MovesResponse struct {
+	Count   int           `json:"count"`
+	Results []MovesResult `json:"results"`
+}
+
+func GetAllMoves() MovesResponse {
+	resp, err := http.Get("https://pokeapi.co/api/v2/move?limit=2000")
+
+	if err != nil {
+		log.Printf("Unable to lookup moves. %s\n", err)
+	}
+
+	var data MovesResponse
+
+	respBytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Printf("Unable to parse moves response. %s\n", err)
+	}
+
+	err = json.Unmarshal(respBytes, &data)
+	if err != nil {
+		log.Printf("Unable to parse moves. %s\n", err)
+	}
+
+	return data
+}
+
 func GetAllAbilities() AbilitiesResponse {
 	resp, err := http.Get("https://pokeapi.co/api/v2/ability?limit=500")
 
@@ -74,6 +107,40 @@ func GetAbilityByName(name string) AbilityResult {
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		log.Printf("Unable to parse ability (%s). %s\n", name, err)
+	}
+
+	return data
+}
+
+type PokemonMove struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type MoveResult struct {
+	Id      string        `json:"id"`
+	Name    string        `json:"name"`
+	Pokemon []PokemonMove `json:"learned_by_pokemon"`
+}
+
+func GetMoveByName(name string) MoveResult {
+	resp, err := http.Get(fmt.Sprintf("https://pokeapi.co/api/v2/move/%s", name))
+
+	if err != nil {
+		log.Printf("Unable to lookup move (%s). %s\n", name, err)
+	}
+
+	var data MoveResult
+
+	respBytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Printf("Unable to parse move (%s) response. %s\n", name, err)
+	}
+
+	err = json.Unmarshal(respBytes, &data)
+	if err != nil {
+		log.Printf("Unable to parse move (%s). %s\n", name, err)
 	}
 
 	return data
