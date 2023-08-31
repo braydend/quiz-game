@@ -175,6 +175,12 @@ func (g *Game) newRound() {
 	randomAbility := data.Results[i]
 
 	ability := pokeapi.GetAbilityByName(randomAbility.Name)
+
+	for len(ability.Pokemon) < 5 {
+		randomAbility := data.Results[rand.Intn(len(data.Results))]
+		ability = pokeapi.GetAbilityByName(randomAbility.Name)
+	}
+
 	g.selectedAbility = &ability
 	g.guessedPokemon = make(map[string]bool)
 	for _, pokemon := range ability.Pokemon {
