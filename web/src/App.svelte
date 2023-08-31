@@ -5,13 +5,9 @@
   import Leaderboard from "./components/Leaderboard.svelte";
   import Timer from "./components/Timer.svelte";
   import RoundInfo from "./components/RoundInfo.svelte";
-
-  type Message = {
-    command: string;
-    payload?: any;
-  };
-
-  let websocket: WebSocket;
+  import Guesser from "./components/Guesser.svelte";
+  import { createSocket, handleSend, socket } from "./helpers/socket";
+  import type { Message } from "./types";
 
   let messages: Message[] = [];
   let msg: string;
@@ -25,9 +21,9 @@
   $: score = 0;
 
   onMount(() => {
-    websocket = new WebSocket(`wss://${location.host}/ws/join`);
+    let socket = createSocket();
 
-    websocket.onmessage = (e) => {
+    socket.onmessage = (e) => {
       const parsedMessage = JSON.parse(e.data) as Message;
       console.log(parsedMessage);
       if (parsedMessage.command.startsWith("SYS")) {
@@ -38,14 +34,10 @@
       messages = [...messages, parsedMessage];
     };
 
-    websocket.addEventListener("open", () => {
+    socket.addEventListener("open", () => {
       handleSend({ command: "SYS_SYNC" });
     });
   });
-
-  const handleSend = (msg: Message) => {
-    websocket?.send(JSON.stringify(msg));
-  };
 
   const handleSystemMessage = (msg: Message) => {
     const { command, payload } = msg;
@@ -103,17 +95,26 @@
 
 <main>
   <Timer />
-  <Name />
-  <Leaderboard />
-  <RoundInfo />
-  <input bind:value={msg} type="text" />
-  <button on:click={() => handleSend({ command: "GUESS", payload: msg })}
-    >Send</button
-  >
-  {#if !hasPrompt}
-    <button
-      on:click={() => handleSend({ command: "SYS_READY", payload: !isReady })}
-      >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
-    >
-  {/if}
+  <div class="container">
+    <Name />
+    {#if hasPrompt}
+      <RoundInfo />
+      <Guesser />
+    {:else}
+      <button
+        on:click={() => handleSend({ command: "SYS_READY", payload: !isReady })}
+        >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
+      >
+    {/if}
+    <Leaderboard />
+  </div>
 </main>
+
+<style>
+  .container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+</style>

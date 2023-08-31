@@ -28,16 +28,30 @@
     Are you ready?
   {/if}
 </h2>
-<div>
+<div class="correctAnswers">
   {#each Object.entries(currentCorrectAnswers) as [name, sprite]}
-    <div class="correctAnswer">
-      <img
-        alt={name}
-        src={sprite}
-        width="128"
-        height="128"
-        in:fade={{ duration: 3000 }}
-      />
-    </div>
+    <img
+      class="sprite"
+      alt={name}
+      src={sprite}
+      width="128"
+      height="128"
+      in:fade={{ duration: 3000 }}
+    />
   {/each}
 </div>
+
+<style>
+  .sprite {
+    width: 128px;
+    height: 128px;
+  }
+
+  .correctAnswers {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    justify-content: space-around;
+    align-items: center;
+  }
+</style>

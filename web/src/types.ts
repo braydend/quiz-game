@@ -8,3 +8,8 @@ export type PlayerScore = {
     name: string,
     score: number
 }
+
+export type Message = {
+    command: string;
+    payload?: any;
+};
