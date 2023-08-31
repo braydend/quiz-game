@@ -46,11 +46,13 @@ func (g *Game) Start() {
 	roundTime := 32 * time.Second
 
 	timer := time.NewTimer(roundTime)
-	for i := 0; i < 10; i++ {
-		g.newRound()
-		<-timer.C
-		timer.Reset(roundTime)
-	}
+	go func() {
+		for i := 0; i < 10; i++ {
+			g.newRound()
+			<-timer.C
+			timer.Reset(roundTime)
+		}
+	}()
 	g.Broadcast([]byte("GAME ENDING"))
 }
 
