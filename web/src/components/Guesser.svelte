@@ -2,7 +2,7 @@
   import { handleSend } from "../helpers/socket";
 
   let pokemon: { name: string }[] = [];
-  let query: string;
+  let query: string = "";
   const endpoint = "https://pokeapi.co/api/v2/pokemon?limit=1000";
 
   fetch(endpoint)
@@ -14,7 +14,11 @@
   $: filteredResults =
     query === ""
       ? []
-      : pokemon.filter(({ name }) => name.includes(query)).slice(0, 10);
+      : pokemon
+          .filter(({ name }) =>
+            name.toLowerCase().includes(query.toLowerCase())
+          )
+          .slice(0, 10);
 
   const handleGuess = (guess: string) => {
     handleSend({ command: "GUESS", payload: guess });
