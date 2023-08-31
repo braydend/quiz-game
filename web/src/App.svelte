@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fade } from "svelte/transition";
   import Name from "./components/Name.svelte";
   import { store } from "./store/appStore";
   import Leaderboard from "./components/Leaderboard.svelte";
   import Timer from "./components/Timer.svelte";
-  import type { PromptProgress } from "./types";
+  import RoundInfo from "./components/RoundInfo.svelte";
 
   type Message = {
     command: string;
@@ -17,18 +16,13 @@
   let messages: Message[] = [];
   let msg: string;
   let isReady = false;
-  let correctAnswers: { [key: string]: string } = {};
-  let currentPrompt: string;
-  let currentPromptProgress: PromptProgress;
-  $: score = 0;
+  let hasPrompt = false;
 
   store.prompt.subscribe((p) => {
-    currentPrompt = p;
-    correctAnswers = {};
+    hasPrompt = p !== "";
   });
-  store.promptProgress.subscribe((p) => {
-    currentPromptProgress = p;
-  });
+
+  $: score = 0;
 
   onMount(() => {
     websocket = new WebSocket(`wss://${location.host}/ws/join`);
@@ -69,7 +63,10 @@
         if (payload) {
           const parsedPayload = payload;
           const { name, sprite } = parsedPayload;
-          correctAnswers[name] = sprite;
+          store.correctAnswers.update((prev) => {
+            prev[name] = sprite;
+            return prev;
+          });
         }
         break;
       case "SYS_UPDATE_SCORE":
@@ -108,37 +105,12 @@
   <Timer />
   <Name />
   <Leaderboard />
-  <h2>
-    {#if currentPrompt && currentPromptProgress}
-      {currentPrompt}
-      {currentPromptProgress.remaining}/{currentPromptProgress.total}
-    {:else}
-      Are you ready?
-    {/if}
-  </h2>
-  <div>
-    {#each Object.entries(correctAnswers) as [name, sprite]}
-      <div class="correctAnswer">
-        <img
-          alt={name}
-          src={sprite}
-          width="128"
-          height="128"
-          in:fade={{ duration: 3000 }}
-        />
-      </div>
-    {/each}
-  </div>
-  <ul>
-    {#each messages as message}
-      <li>{JSON.stringify(message)}</li>
-    {/each}
-  </ul>
+  <RoundInfo />
   <input bind:value={msg} type="text" />
   <button on:click={() => handleSend({ command: "GUESS", payload: msg })}
     >Send</button
   >
-  {#if !currentPrompt}
+  {#if !hasPrompt}
     <button
       on:click={() => handleSend({ command: "SYS_READY", payload: !isReady })}
       >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
