@@ -129,8 +129,10 @@
   <button on:click={() => handleSend({ command: "GUESS", payload: msg })}
     >Send</button
   >
-  <button
-    on:click={() => handleSend({ command: "SYS_READY", payload: !isReady })}
-    >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
-  >
+  {#if !currentPrompt}
+    <button
+      on:click={() => handleSend({ command: "SYS_READY", payload: !isReady })}
+      >{isReady ? "WAITING FOR OTHERS" : "LET'S PLAY"}</button
+    >
+  {/if}
 </main>
