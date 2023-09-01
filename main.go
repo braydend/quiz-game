@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/braydend/quiz-game/src/game"
@@ -46,15 +45,12 @@ func main() {
 
 		game, ok := games[id]
 
-		if !ok {
-			c.WriteMessage(websocket.CloseMessage, []byte(fmt.Sprintf("Unable to find game with the ID: %s", id)))
-			return
+		if ok {
+			game.AddClient(c)
 		}
-
-		game.AddClient(c)
 	}))
 
-	app.Get("/create/:id", func(c *fiber.Ctx) error {
+	app.Get("/games/create/:id", func(c *fiber.Ctx) error {
 		id := c.Params("id")
 		games[id] = game.NewGame()
 		return nil
@@ -62,6 +58,17 @@ func main() {
 
 	app.Get("/games", func(c *fiber.Ctx) error {
 		return c.JSON(games)
+	})
+
+	// Check whether a game exists
+	app.Get("/games/:id", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+
+		_, ok := games[id]
+		type resp struct {
+			Exists bool `json:"exists"`
+		}
+		return c.JSON(resp{Exists: ok})
 	})
 
 	app.Listen(getPort())

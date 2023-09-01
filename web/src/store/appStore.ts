@@ -7,6 +7,7 @@ const id = writable("");
 const prompt = writable("")
 const promptProgress = writable<PromptProgress>()
 const correctAnswers = writable<{[key: string]: string}>()
+const isReady = writable(false)
 
 export const store = {
     id,
@@ -14,5 +15,6 @@ export const store = {
     leaderboard,
     prompt,
     promptProgress,
-    correctAnswers
+    correctAnswers,
+    isReady
 }
