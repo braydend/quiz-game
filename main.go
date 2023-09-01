@@ -45,7 +45,12 @@ func main() {
 
 		game, ok := games[id]
 
+		userIdCookie := c.Cookies("userId")
+
 		if ok {
+			if userIdCookie != "" {
+				game.ReconnectClient(c, userIdCookie)
+			}
 			game.AddClient(c)
 		}
 	}))

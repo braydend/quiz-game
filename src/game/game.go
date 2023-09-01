@@ -28,6 +28,18 @@ func NewGame() Game {
 	return Game{clients: clients, guessedPokemon: guessedPokemon}
 }
 
+// If user reconnects, check if they have an id cookie so they can resume their place
+func (g *Game) ReconnectClient(c *websocket.Conn, userId string) {
+	for oldConnection, player := range g.clients {
+		if player.Id() == userId {
+			g.clients[c] = player
+			clients := g.clients
+			delete(clients, oldConnection)
+			g.messageHandler(c)
+		}
+	}
+}
+
 func (g *Game) AddClient(c *websocket.Conn) {
 	_, isExistingConnection := g.clients[c]
 

@@ -66,6 +66,7 @@ const handleSystemMessage = (msg: Message) => {
         store.leaderboard.set(payload.scores);
         break;
     case "SYS_UPDATE_USER_DATA":
+        document.cookie = `userId=${payload.id}`
         store.id.set(payload.id);
         store.name.set(payload.name);
         break;
