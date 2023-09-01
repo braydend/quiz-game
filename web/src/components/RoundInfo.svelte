@@ -18,6 +18,12 @@
   store.promptProgress.subscribe((p) => {
     currentPromptProgress = p;
   });
+
+  const getRandomPosition = () => {
+    const max = 30;
+    const min = 0;
+    return Math.random() * (max - min) + min;
+  };
 </script>
 
 <h2>
@@ -29,7 +35,7 @@
   {/if}
 </h2>
 <div class="correctAnswers">
-  {#each Object.entries(currentCorrectAnswers) as [name, sprite]}
+  {#each Object.entries(currentCorrectAnswers) as [name, sprite], index}
     <img
       class="sprite"
       alt={name}
@@ -37,6 +43,9 @@
       width="128"
       height="128"
       in:fade={{ duration: 3000 }}
+      style={`z-index: ${
+        index + 1
+      }; margin-top: ${getRandomPosition()}vw; margin-left: ${getRandomPosition()}vw`}
     />
   {/each}
 </div>
@@ -45,14 +54,19 @@
   .sprite {
     width: 128px;
     height: 128px;
+    position: absolute;
   }
 
   .correctAnswers {
+    height: 45vw;
+    width: 90vw;
+    background-image: url("/pokeball.svg");
+    background-repeat: no-repeat;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin: 0 auto;
+    border: 4px solid black;
+    border-radius: 4px;
     display: flex;
-    flex-direction: row;
-    gap: 1rem;
-    justify-content: space-around;
-    align-items: center;
-    flex-wrap: wrap;
   }
 </style>
