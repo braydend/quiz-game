@@ -6,7 +6,7 @@
   import RoundInfo from "./components/RoundInfo.svelte";
   import Guesser from "./components/Guesser.svelte";
   import { handleSend } from "./helpers/socket";
-  import RoomControl from "./components/RoomControl.svelte";
+  import Lobby from "./components/Lobby.svelte";
 
   let isInRoom = false;
   let isCurrentlyReady = false;
@@ -41,7 +41,7 @@
       <Leaderboard />
     </div>
   {:else}
-    <RoomControl
+    <Lobby
       onGameJoined={() => {
         isInRoom = true;
       }}

@@ -3,12 +3,6 @@ import type { Message } from "../types";
 
 export let socket: WebSocket|undefined = undefined
 
-export const createSocket = () => {
-    socket = new WebSocket(`wss://${location.host}/ws/join`);
-
-    return socket
-}
-
 export const createSocketFromId = (id:string) => {
     socket = new WebSocket(`wss://${location.host}/ws/join/${id}`);
 
